@@ -559,14 +559,16 @@ namespace LIOSAM
                     //                       +(lastKeyFramePoint.y-currentKeyFramePonit.y)*(lastKeyFramePoint.y-currentKeyFramePonit.y)+
                     //                        (lastKeyFramePoint.z-currentKeyFramePonit.z)*(lastKeyFramePoint.z-currentKeyFramePonit.z));
                    // if(point_distance< 0.5)
+
                   //  {
                     if(scManager->relo_scan2MapOptimization(thisRawCloudKeyFrame,lastKeyFramePoint,currentKeyFramePonit))
                     {
                     successcount++;
-                    }
+                    } 
                    //     successcount++;
                         break;
-                   // }
+                   // } 
+
                 }
                 // *1 观察错误的点云形状
                 std::stringstream filename;
