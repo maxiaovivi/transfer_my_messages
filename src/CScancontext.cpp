@@ -3,6 +3,7 @@
 #include <experimental/filesystem>
 #include <boost/filesystem.hpp>
 #include <pcl/surface/poisson.h>
+#include <pcl/octree/octree_pointcloud_voxelcentroid.h>
 /********************************** Name space ************************************/
 
 //using namespace std;
@@ -638,7 +639,7 @@ Others:       None
 ***********************************************************************************/
 void CScancontext::loadAllSCD(char delimiter)
 {
-    std::string loadSCDDirectory = "/home/maxiaovivi/doubletx-offline/doubletx-offline/global_scancontext/"; // 替换为你的目录
+    std::string loadSCDDirectory = "/home/maxiaovivi/doubletx-offline/doubletx-offline/allscd/global_scancontext/"; // 替换为你的目录
     int count = 0;
 
     fs::path directory(loadSCDDirectory);
@@ -691,7 +692,7 @@ Others:       None
 ***********************************************************************************/
 void CScancontext::loadPoses()
 {
-    std::string filePath = "/home/maxiaovivi/doubletx-offline/doubletx-offline/scPose.txt";
+    std::string filePath = "/home/maxiaovivi/doubletx-offline/doubletx-offline/allscd/scPose.txt";
     std::ifstream file(filePath);
     std::string line;
     while (std::getline(file, line)) {
@@ -725,7 +726,7 @@ bool CScancontext::enoughPointCheck(pcl::PointCloud<PointType>::Ptr couldFrame,P
     *this_scan_cloud = transform2Scan(Trans2mScan, 0.05, 0.6, true, 0.02); // 0.05  0.5
     std::cout << "this_scan_cloud->size() " << this_scan_cloud->size() << std::endl;
 
-    return (int)this_scan_cloud->size() > 100;
+    return (int)this_scan_cloud->size() > 90;
 }
 /***********************************************************************************
 Function:     relo_scan2MapOptimization
@@ -815,8 +816,8 @@ bool CScancontext::relo_angularBruceAlignment(pcl::PointCloud<PointType>::Ptr lo
     transform_tobe[5] = local_cloud_pose.z;
 
     Eigen::Affine3f transTobe = trans2Affine3f(transform_tobe);
-    float angular_search_window = 45.0 * DEG_TO_ARC; // 4.5
-    int step_count = 19; // 4
+    float angular_search_window = 60.0 * DEG_TO_ARC; // 4.5
+    int step_count = 13; // 4
 
     // angular candidate
     std::vector<float> angular_bound;
@@ -1060,7 +1061,7 @@ Others:       None
 void CScancontext::loadSavedGlobalMap()
 {
         // 文件路径
-        std::string file_path = "/home/maxiaovivi/doubletx-offline/doubletx-offline/saved_global_map/global_map.pcd";
+        std::string file_path = "/home/maxiaovivi/doubletx-offline/doubletx-offline/allscd/saved_global_map/global_map.pcd";
 
         // 读取PCD文件
         if (pcl::io::loadPCDFile<PointType>(file_path, *m_tof_cloud_saved_global_map) == -1) {
@@ -1074,12 +1075,12 @@ void CScancontext::loadSavedGlobalMap()
                 << std::endl;
 
        // pcl::PointCloud<PointType>::Ptr m_global_scan(new pcl::PointCloud<PointType>());
-        *m_global_scan = transform2Scan(m_tof_cloud_saved_global_map, 0.3, 0.6, true, 0.05);    
-
+        *m_global_scan = transform2Scan(m_tof_cloud_saved_global_map, 0.03, 0.6, true, 0.05);    
+        std::cout<<"maxiao baocunhaole "<<std::endl;
         std::stringstream filename6;
-        filename6 << "/home/maxiaovivi/doubletx-offline/doubletx-offline/saved_global_map/m_global_scan" << std::setw(6) << std::setfill('0') << 0 << ".pcd";
+        filename6 << "/home/maxiaovivi/doubletx-offline/doubletx-offline/allscd/saved_global_map/m_global_scan" << std::setw(6) << std::setfill('0') << 0 << ".pcd";
         pcl::io::savePCDFileASCII(filename6.str(), *m_global_scan);
-
+        std::cout<<"maxiao zhen neng baocuna "<<std::endl;
 
 }
 /***********************************************************************************
@@ -1090,51 +1091,35 @@ Output:       None
 Return:       None
 Others:       None
 ***********************************************************************************/
-pcl::PointCloud<PointType> CScancontext::transform2Scan(pcl::PointCloud<PointType>::Ptr CloudIn, float z_min, float z_max, bool ds_flag, float ds_cellsize)
+pcl::PointCloud<pcl::PointXYZI> CScancontext::transform2Scan(pcl::PointCloud<pcl::PointXYZI>::Ptr cloudIn, float z_min, float z_max, bool ds_flag, float resolution)
 {
-    pcl::PointCloud<PointType>::Ptr temp_feature_cloud(new pcl::PointCloud<PointType>());
-    pcl::PointCloud<PointType>::Ptr temp_feature_cloud_ds(new pcl::PointCloud<PointType>()); // DEBUG_LJH
-    // std::vector<float> scan;
-    // scan.resize(360, 0);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZI>());
 
-    for (size_t i = 0; i < CloudIn->size(); i++)
-    {
-        if (CloudIn->points[i].z > z_min && CloudIn->points[i].z < z_max)
-        {
-            double range = sqrt(pow(CloudIn->points[i].x, 2) + pow(CloudIn->points[i].y, 2));
-            double angle = atan2(CloudIn->points[i].y, CloudIn->points[i].x); //(-M_PI, M_PI]
-            // int index = std::round((angle + M_PI) * 180.0 / M_PI);
-            int index = std::round(angle + M_PI / 2);
-            // std::cout << "__DEBUG_LJH__"
-            //           << " INDEX_POINT = " << index << std::endl;
-            // if (index >= 180)
-            //     index = index - 180;
-
-            // if (scan[index] == 0 || (range < scan[index] && range > 0))
-            {
-                // scan[index] = range;
-                PointType temp_scanPoint;
-                temp_scanPoint.x = CloudIn->points[i].x;
-                temp_scanPoint.y = CloudIn->points[i].y;
-                temp_scanPoint.z = 4;
-                temp_feature_cloud_ds->push_back(temp_scanPoint);
-            }
+    // Filter points by z-axis limits
+    for (const auto& point : *cloudIn) {
+        if (point.z > z_min && point.z < z_max) {
+            filtered_cloud->push_back(point);
         }
     }
-    // std::cout << "__DEBUG_LJH__"
-    //           << " remin cloud= " << temp_feature_cloud_ds->size() << std::endl;
 
-    if(ds_flag) {
-        pcl::VoxelGrid<PointType> ds_filter_scan;
-        ds_filter_scan.setInputCloud(temp_feature_cloud_ds);
-        ds_filter_scan.setLeafSize(ds_cellsize, ds_cellsize, ds_cellsize);
-        ds_filter_scan.filter(*temp_feature_cloud);        
+    pcl::PointCloud<pcl::PointXYZI> downsampled_cloud;
+    if (ds_flag) {
+        // Using octree for downsampling
+        pcl::octree::OctreePointCloudVoxelCentroid<pcl::PointXYZI> octree(resolution);
+        octree.setInputCloud(filtered_cloud);
+        octree.addPointsFromInputCloud();
+
+        std::vector<pcl::PointXYZI, Eigen::aligned_allocator<pcl::PointXYZI>> centroids;
+        octree.getVoxelCentroids(centroids);
+        downsampled_cloud.points = centroids;  // Assign the centroids to the point cloud
+        downsampled_cloud.width = centroids.size();
+        downsampled_cloud.height = 1;
+        downsampled_cloud.is_dense = false;
     } else {
-        pcl::copyPointCloud(*temp_feature_cloud_ds, *temp_feature_cloud);
+        pcl::copyPointCloud(*filtered_cloud, downsampled_cloud);
     }
-    // std::cout << "__DEBUG_LJH__"
-    //           << "After remin cloud= " << temp_feature_cloud->size() << std::endl;
-    return *temp_feature_cloud;
+
+    return downsampled_cloud;
 }
 /***********************************************************************************
 Function:     pclPointToAffine3f
@@ -1208,24 +1193,25 @@ bool CScancontext::relo_scanMatchForBruceAlignment(const float transformIn[6], c
     *this_scan_cloud = transform2Scan(Trans2mScan, 0.01, 0.6, true, 0.02); // 0.05  0.5
 
     pcl::PointCloud<PointType>::Ptr this_submap_cloud(new pcl::PointCloud<PointType>());
-    pcl::copyPointCloud(*CloudTarget, *this_submap_cloud);   
-
+    pcl::copyPointCloud(*this_scan_cloud, *this_submap_cloud);   
+ 
+    auto start = std::chrono::high_resolution_clock::now();
 
     pcl::IterativeClosestPoint<PointType, PointType> icp;
     pcl::registration::TransformationEstimation2D<PointType, PointType>::Ptr est;
     est.reset(new pcl::registration::TransformationEstimation2D<PointType, PointType>);
     icp.setTransformationEstimation(est);
     icp.setMaxCorrespondenceDistance(0.8);
-    icp.setMaximumIterations(100);
+    icp.setMaximumIterations(50);
     icp.setTransformationEpsilon(0.001);
     icp.setEuclideanFitnessEpsilon(0.1);
     icp.setRANSACIterations(0);
 
-    // pcl::PointCloud<PointType>::Ptr copied_cloud(new pcl::PointCloud<PointType>);
-    // pcl::copyPointCloud(*m_global_scan, *copied_cloud);
-
     pcl::PointCloud<PointType>::Ptr copied_cloud(new pcl::PointCloud<PointType>);
-    pcl::copyPointCloud(*m_tof_cloud_saved_global_map, *copied_cloud);
+    pcl::copyPointCloud(*m_global_scan, *copied_cloud);
+
+    // pcl::PointCloud<PointType>::Ptr copied_cloud(new pcl::PointCloud<PointType>);
+    // pcl::copyPointCloud(*m_tof_cloud_saved_global_map, *copied_cloud);
 
     // Align clouds
     icp.setInputSource(Trans2mScan);
@@ -1235,12 +1221,20 @@ bool CScancontext::relo_scanMatchForBruceAlignment(const float transformIn[6], c
     icp.align(*unused_result);
     score = icp.getFitnessScore();
 
+    // 记录结束时间
+    auto end = std::chrono::high_resolution_clock::now();
+
+    // 计算持续时间
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    // 输出结果
+    std::cout << "datatime Function took " << duration << " milliseconds to execute.\n";
 
     // Get pose transformation
     Eigen::Affine3f correctionLidarFrame;
     correctionLidarFrame = icp.getFinalTransformation();
     // Judge
-    if (icp.hasConverged() == true && score < 0.005){
+    if (icp.hasConverged() == true && score < 0.3){
         // sai: TODO CHECK TRANSFORMATION -> icp.getFinalTransformation()
         // sai: TODO 在点云密集时，有大位移和大角度偏差的可能
         float delta_x, delta_y, delta_z, delta_roll, delta_pitch, delta_yaw;
@@ -1253,15 +1247,15 @@ bool CScancontext::relo_scanMatchForBruceAlignment(const float transformIn[6], c
         pcl::PointCloud<PointType>::Ptr transformed_cloud1(new pcl::PointCloud<PointType>);
         pcl::transformPointCloud(*Trans2mScan, *transformed_cloud1, transformation);
 
-        std::stringstream filename7;
-        std::stringstream filename8;
-        static int count7 =0;
-        filename7 << "/home/maxiaovivi/doubletx-offline/doubletx-offline/icp_test/icp" << std::setw(6) << std::setfill('0') << count7 << "before.pcd";
-        pcl::io::savePCDFileASCII(filename7.str(), *Trans2mScan);
-        filename8 << "/home/maxiaovivi/doubletx-offline/doubletx-offline/icp_test/icp" << std::setw(6) << std::setfill('0') << count7 << "after.pcd";
-        pcl::io::savePCDFileASCII(filename8.str(), *transformed_cloud1);
-        // 此处执行对齐操作
-        count7++;
+        // std::stringstream filename7;
+        // std::stringstream filename8;
+        // static int count7 =0;
+        // filename7 << "/home/maxiaovivi/doubletx-offline/doubletx-offline/allscd/icp_test/icp" << std::setw(6) << std::setfill('0') << count7 << "before.pcd";
+        // pcl::io::savePCDFileASCII(filename7.str(), *Trans2mScan);
+        // filename8 << "/home/maxiaovivi/doubletx-offline/doubletx-offline/allscd/icp_test/icp" << std::setw(6) << std::setfill('0') << count7 << "after.pcd";
+        // pcl::io::savePCDFileASCII(filename8.str(), *transformed_cloud1);
+        // // 此处执行对齐操作
+        // count7++;
         
         if (sqrt(pow(delta_x,2)+pow(delta_y,2)) > 0.5 || abs(delta_yaw) > 0.2 ) {
             scanmatch_sucess = false;

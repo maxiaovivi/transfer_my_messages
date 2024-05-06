@@ -357,7 +357,7 @@ void CMapOptimization::updateInitialGuess()
         // m_transform_tobe_mapped[0] = m_cloud_info.initialGuessRoll;
         // m_transform_tobe_mapped[1] = m_cloud_info.initialGuessPitch;
         // m_transform_tobe_mapped[2] = m_cloud_info.initialGuessYaw;
-        m_transform_tobe_mapped[2] = 2.24;
+        m_transform_tobe_mapped[2] = 1.95;
         lastImuPreTransformation = pcl::getTransformation(0, 0, 0, m_cloud_info.initialGuessRoll, m_cloud_info.initialGuessPitch, m_cloud_info.initialGuessYaw);
         return;
     }
@@ -980,7 +980,7 @@ void CMapOptimization::surfOptimizationAndCalculateDeltaXYZ()
 void CMapOptimization::pointAssociateToMap(PointType const *const pi, PointType *const po)
 {
     po->x = m_trans_Point_associate_to_map(0, 0) * pi->x + m_trans_Point_associate_to_map(0, 1) * pi->y + m_trans_Point_associate_to_map(0, 2) * pi->z + m_trans_Point_associate_to_map(0, 3);
-    po->y = m_trans_Point_associate_to_map(1, 0) * pi->x + m_trans_Point_associate_to_map(1, 1) * pi->y + m_trans_Point_associate_to_map(1, 2) * pi->z + m_trans_Point_associate_to_map(1, 3);
+    po->y =  m_trans_Point_associate_to_map(1, 0) * pi->x + m_trans_Point_associate_to_map(1, 1) * pi->y + m_trans_Point_associate_to_map(1, 2) * pi->z + m_trans_Point_associate_to_map(1, 3);
     po->z = m_trans_Point_associate_to_map(2, 0) * pi->x + m_trans_Point_associate_to_map(2, 1) * pi->y + m_trans_Point_associate_to_map(2, 2) * pi->z + m_trans_Point_associate_to_map(2, 3);
     po->intensity = pi->intensity;
 }

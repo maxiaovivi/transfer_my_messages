@@ -469,10 +469,10 @@ namespace LIOSAM
 
         // // *1 保存点云文件
         static int  save_count = 0 ;
-        std::stringstream filename3;
-        filename3 << "/home/maxiaovivi/doubletx-offline/doubletx-offline/temp_global_pcd/scPCD" << std::setw(6) << std::setfill('0') << save_count << ".pcd";
-        pcl::io::savePCDFileASCII(filename3.str(), *keyframe_surf);
-        std::cout <<RED <<"Saved " << filename3.str() <<RESET <<std::endl;
+        // std::stringstream filename3;
+        // filename3 << "/home/maxiaovivi/doubletx-offline/doubletx-offline/allscd/temp_global_pcd/scPCD" << std::setw(6) << std::setfill('0') << save_count << ".pcd";
+        // pcl::io::savePCDFileASCII(filename3.str(), *keyframe_surf);
+        // std::cout <<RED <<"Saved " << filename3.str() <<RESET <<std::endl;
         save_count++;
 
         // // *2 保存SC算子
@@ -510,6 +510,8 @@ namespace LIOSAM
         static int relocount = 0;
         static int successcount =0;
         static int nomatchcount = 0;
+        static int matchsccount = 0;
+        bool real_flag = false;
         pcl::PointCloud<PointType>::Ptr thisRawCloudKeyFrame(new pcl::PointCloud<PointType>);
         {
         std::lock_guard<std::mutex> lock11(m_mtx_keycloud);
@@ -524,6 +526,7 @@ namespace LIOSAM
         {
             std::cout<< "maxiao 没有可以匹配上的值"<<std::endl;
             nomatchcount++;
+    //        matchsccount++;
         }
         else if(!scManager->enoughPointCheck(thisRawCloudKeyFrame,m_key_frame_poses_6d->back()))
         {
@@ -559,21 +562,24 @@ namespace LIOSAM
                     //                       +(lastKeyFramePoint.y-currentKeyFramePonit.y)*(lastKeyFramePoint.y-currentKeyFramePonit.y)+
                     //                        (lastKeyFramePoint.z-currentKeyFramePonit.z)*(lastKeyFramePoint.z-currentKeyFramePonit.z));
                    // if(point_distance< 0.5)
-
                   //  {
                     if(scManager->relo_scan2MapOptimization(thisRawCloudKeyFrame,lastKeyFramePoint,currentKeyFramePonit))
                     {
                     successcount++;
-                    } 
+                    real_flag =true;
+                    break;
+                    }
                    //     successcount++;
-                        break;
-                   // } 
 
+                   // }
                 }
-                // *1 观察错误的点云形状
-                std::stringstream filename;
-                filename << "/home/maxiaovivi/doubletx-offline/doubletx-offline/temp_pcd/scPCDerror" << std::setw(6) << std::setfill('0') << loop_KeyPre << ".pcd";
-                pcl::io::savePCDFileASCII(filename.str(), *thisRawCloudKeyFrame);
+                if(!real_flag) 
+                {
+                     // *1 观察错误的点云形状
+                    std::stringstream filename;
+                    filename << "/home/maxiaovivi/doubletx-offline/doubletx-offline/allscd/temp_pcd/scPCDerror" << std::setw(6) << std::setfill('0') << loop_KeyPre << ".pcd";
+                    pcl::io::savePCDFileASCII(filename.str(), *thisRawCloudKeyFrame);
+                }
             }
         }
         scManager->popCurrentKey();
@@ -581,8 +587,11 @@ namespace LIOSAM
         relocount++;
         float rate = float(successcount) /float( relocount);
         float rate2 = float(successcount) /float(relocount-nomatchcount);
-        std::cout<<"maxiao 非误匹配率为   "<< rate2 <<"  没有值的次数： "<<nomatchcount<<std::endl;
-        std::cout<<"maxiao 重定位成功率为 "<< rate  <<"  执行次数：     "<<relocount   <<"  成功次数： "<<successcount<<std::endl;
+  //      float rate3 = float(relocount-matchsccount) /float(relocount);
+        std::cout<<"maxiao 重定位成功率为   "<< rate2 <<"  没有值的次数： "<<nomatchcount<<std::endl;
+        std::cout<<"maxiao 成功帧率为 "<< rate  <<"  执行次数：     "<<relocount   <<"  成功次数： "<<successcount<<std::endl;
+//        std::cout<<"maxiao sc帧率为 "<< rate3<<  std::endl;
+
         globalMapAddKeyCloud(keyframe_surf);
         thinMapAddKeyCloud(keyframe_surf);
         std::cout  <<std::endl;
@@ -1118,7 +1127,7 @@ namespace LIOSAM
 
                 // 为这个点云集创建一个唯一的文件名
                 std::stringstream ss;
-                ss << "/home/maxiaovivi/doubletx-offline/doubletx-offline/scd_PCD/cloud_cluster_" << center.x << "_" << center.y << ".pcd";
+                ss << "/home/maxiaovivi/doubletx-offline/doubletx-offline/allscd/scd_PCD/cloud_cluster_" << center.x << "_" << center.y << ".pcd";
 
                 
                 // 确保cloudCluster是无组织的点云
