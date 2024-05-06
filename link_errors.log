@@ -1,13 +1,14 @@
-/opt/rv1126-rockchip-linux-toolchain/gcc-arm-linux-gnueabihf-bruce/bin/../lib/gcc/arm-linux-gnueabihf/8.3.0/../../../../arm-linux-gnueabihf/bin/ld: ../../../install/rv1126/lib/libliosam.a(CLocalMapping.cpp.o): in function `pcl::PCDWriter::write(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, pcl::PCLPointCloud2 const&, Eigen::Matrix<float, 4, 1, 0, 4, 1> const&, Eigen::Quaternion<float, 0> const&, bool)':
-/opt/rv1126-rockchip-linux-toolchain/gcc-arm-linux-gnueabihf-bruce/3rdParty/include/pcl-1.9/pcl/io/pcd_io.h:458: undefined reference to `pcl::PCDWriter::writeBinary(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, pcl::PCLPointCloud2 const&, Eigen::Matrix<float, 4, 1, 0, 4, 1> const&, Eigen::Quaternion<float, 0> const&)'
-/opt/rv1126-rockchip-linux-toolchain/gcc-arm-linux-gnueabihf-bruce/bin/../lib/gcc/arm-linux-gnueabihf/8.3.0/../../../../arm-linux-gnueabihf/bin/ld: /opt/rv1126-rockchip-linux-toolchain/gcc-arm-linux-gnueabihf-bruce/3rdParty/include/pcl-1.9/pcl/io/pcd_io.h:460: undefined reference to `pcl::PCDWriter::writeASCII(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, pcl::PCLPointCloud2 const&, Eigen::Matrix<float, 4, 1, 0, 4, 1> const&, Eigen::Quaternion<float, 0> const&, int)'
-/opt/rv1126-rockchip-linux-toolchain/gcc-arm-linux-gnueabihf-bruce/bin/../lib/gcc/arm-linux-gnueabihf/8.3.0/../../../../arm-linux-gnueabihf/bin/ld: ../../../install/rv1126/lib/libliosam.a(CLocalMapping.cpp.o): in function `int pcl::PCDWriter::writeASCII<pcl::PointXYZI>(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, pcl::PointCloud<pcl::PointXYZI> const&, int)':
-/opt/rv1126-rockchip-linux-toolchain/gcc-arm-linux-gnueabihf-bruce/3rdParty/include/pcl-1.9/pcl/io/impl/pcd_io.hpp:462: undefined reference to `pcl::PCDWriter::setLockingPermissions(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, boost::interprocess::file_lock&)'
-/opt/rv1126-rockchip-linux-toolchain/gcc-arm-linux-gnueabihf-bruce/bin/../lib/gcc/arm-linux-gnueabihf/8.3.0/../../../../arm-linux-gnueabihf/bin/ld: /opt/rv1126-rockchip-linux-toolchain/gcc-arm-linux-gnueabihf-bruce/3rdParty/include/pcl-1.9/pcl/io/impl/pcd_io.hpp:607: undefined reference to `pcl::PCDWriter::resetLockingPermissions(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, boost::interprocess::file_lock&)'
-collect2: error: ld returned 1 exit status
-apps/everest-server/CMakeFiles/everest-server.dir/build.make:265: recipe for target '../install/rv1126/bin/everest-server' failed
-make[2]: *** [../install/rv1126/bin/everest-server] Error 1
-CMakeFiles/Makefile2:6922: recipe for target 'apps/everest-server/CMakeFiles/everest-server.dir/all' failed
-make[1]: *** [apps/everest-server/CMakeFiles/everest-server.dir/all] Error 2
-Makefile:90: recipe for target 'all' failed
-make: *** [all] Error 2
+## 简介
+重定位与回环检测是常用于相比较的两项工作，他们都致力于已有地图的前提下发现曾经的相似场景。 不同点在于回环检测工作于SLAM运行的前提下用于位姿优化和地图优化，是有先验的里程计信息的。 而重定位并没有先验的里程计信息，是假设在已知地图当中重新获取位姿的方法。
+
+因此，想要做好重定位的工作就需要假设出在地图中的一个位姿，进行校验，或者直接通过地图中非常特别的特征进行匹配。想要在地图中构建出独一无二的特征并且SLAM系统中获取到关键帧构建出相同特征对于传统方法是十分困难的，深度学习的方法在近年颇有进展，但想要下放到嵌入式平台仍然有很长的一段距离。
+
+所以可以选在方法是在全局中使用一个不太精确的初始位姿估计以及在局部进行精确的估计。或者通过加速的方式，假设出很多可能的初始位置，进行精确匹配，通过匹配率得出最有可能的位姿。
+
+## 扫地机中重定位基本框架介绍
+在我们的双3DTOF的SLAM框架中运用重定位也分为两个关键步骤。 第一步是用SC算子估计出近似位姿，第二部步是利用ICP算法进行精配准得到具体的位姿。
+
+## SC算子
+按照极坐标的形式将点云分割为一个又一个区块，也是就bin（黑色区域）。取这个区域内的z轴最大值作为这个区域的最大值。记录下在建图过程中使用关键帧制作的多个SC算子，保存后作为重定位使用。
+
+SC算子的匹配原理也是分为两个阶段的，第一个阶段是快速搜索，利用KD树搜索出一个候选者的队列，第二阶段在候选者队列当中进行对当前算子的余弦距离暴力匹配，找到余弦距离最接近的算子，认为他们是最相似的。 余弦距离暴力匹配解释： 余弦距离是通过对两个SC算子中，对应下标的Sector算子进行余弦距离计算，但因为是用ring_key进行快速匹配的，该算子有旋转不变性，所以sector计算时需要平移下标，计算出一个最短距离作为依据。
