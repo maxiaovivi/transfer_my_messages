@@ -1,1 +1,31 @@
-git@github.com:maxiaovivi/obsidian.git
+bool LocalTrajectoryBuilder::judgeLongAisleCondition(bool                     &flag,
+                                                     const transform::Rigid2d &predict_pose,
+                                                     transform::Rigid2d       &track_pose){
+    if(!flag)
+    {
+        flag = false;
+    }
+    else
+    {
+        double predict_x = predict_pose.translation().x();
+        double predict_y = predict_pose.translation().y();
+        double predict_theta = predict_pose.rotation().angle();
+
+        double track_x = track_pose.translation().x();
+        double track_y = track_pose.translation().y();
+        double track_theta = track_pose.rotation().angle();
+
+        double delta_x_predict_to_track = predict_x - track_x;
+        double delta_y_predict_to_track = predict_y - track_y;
+        double delta_theta_predict_to_track = predict_theta - track_theta;
+
+        if(delta_theta_predict_to_track > 3.1415926) delta_theta_predict_to_track = 2 * 3.1415926 - delta_theta_predict_to_track;
+        else if(delta_theta_predict_to_track < -3.1415926) delta_theta_predict_to_track = 2 * 3.1415926 + delta_theta_predict_to_track;
+
+        transform::Rigid2d estimate_pose = transform::Rigid2d(transform::Rigid2d::Vector(predict_x, predict_y), track_pose.rotation());
+        track_pose = estimate_pose;
+        flag = true;
+    }
+
+    return flag;
+}
