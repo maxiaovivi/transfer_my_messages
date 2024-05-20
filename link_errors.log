@@ -1,31 +1,51 @@
-bool LocalTrajectoryBuilder::judgeLongAisleCondition(bool                     &flag,
-                                                     const transform::Rigid2d &predict_pose,
-                                                     transform::Rigid2d       &track_pose){
-    if(!flag)
+/***********************************************************************************
+Function:     judgeLongAisle
+Description:  judgeLongAisle
+Input:        None
+Output:       None
+Return:       None
+Others:       None
+***********************************************************************************/
+bool CCartographerSlam::judgeLongAisle(everest::obs::CObservationLidar lidar)
+{
+    CRobotPose2D robot_pose = m_carto_real_time_pose;
+
+    std::vector<CLineSegment>   line_segment;
+    CLineSegmentExtraction      line_segment_extraction;
+
+    CRobotPose2D pose = robot_pose + CRobotPose2D(0.0, 0.0, M_PI);
+    CRobotPose2D trans_pose = pose + CRobotPose2D(LIDAR_SENSOR_POSE, 0.0, 0.0);
+    line_segment_extraction.extractLongLineSegment(lidar.getLidarScan(), trans_pose, line_segment);
+
+    if(line_segment.size() <= 1)
     {
-        flag = false;
-    }
-    else
-    {
-        double predict_x = predict_pose.translation().x();
-        double predict_y = predict_pose.translation().y();
-        double predict_theta = predict_pose.rotation().angle();
-
-        double track_x = track_pose.translation().x();
-        double track_y = track_pose.translation().y();
-        double track_theta = track_pose.rotation().angle();
-
-        double delta_x_predict_to_track = predict_x - track_x;
-        double delta_y_predict_to_track = predict_y - track_y;
-        double delta_theta_predict_to_track = predict_theta - track_theta;
-
-        if(delta_theta_predict_to_track > 3.1415926) delta_theta_predict_to_track = 2 * 3.1415926 - delta_theta_predict_to_track;
-        else if(delta_theta_predict_to_track < -3.1415926) delta_theta_predict_to_track = 2 * 3.1415926 + delta_theta_predict_to_track;
-
-        transform::Rigid2d estimate_pose = transform::Rigid2d(transform::Rigid2d::Vector(predict_x, predict_y), track_pose.rotation());
-        track_pose = estimate_pose;
-        flag = true;
+        return false;
     }
 
-    return flag;
+    for(int i = 0; i < line_segment.size(); i++)
+    {
+        CLineSegment line = line_segment.at(i);
+        for(int j = 1; j < line_segment.size(); j++)
+        {
+            if(!line.isParallel(line_segment.at(j), 0.3))
+            {
+                return false;
+            }
+        }
+    }
+
+    for(int i = 0; i < line_segment.size(); i++)
+    {
+        CLineSegment line = line_segment.at(i);
+        for(int j = 1; j < line_segment.size(); j++)
+        {
+            CRobotPose2D pose = line_segment.at(j).getStartPose();
+            if(line.getAbsDistanceFromPoint(pose) > 0.5)
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
