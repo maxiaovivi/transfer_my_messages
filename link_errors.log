@@ -1,51 +1,46 @@
-/***********************************************************************************
-Function:     judgeLongAisle
-Description:  judgeLongAisle
-Input:        None
-Output:       None
-Return:       None
-Others:       None
-***********************************************************************************/
-bool CCartographerSlam::judgeLongAisle(everest::obs::CObservationLidar lidar)
-{
-    CRobotPose2D robot_pose = m_carto_real_time_pose;
+void PoseTracker::GetPoseEstimateMeanAndCovariance(const common::Time time,
+                                                   transform::Rigid3d* pose,
+                                                   PoseCovariance* covariance) {
+  const Distribution belief = GetBelief(time);
+  *pose = RigidFromState(belief.GetMean());
 
-    std::vector<CLineSegment>   line_segment;
-    CLineSegmentExtraction      line_segment_extraction;
+#if SAVE_RAWLOG
+#else
+  std::cout << "getpose.trans = " << (*pose).translation() <<std::endl;
+#endif // SAVE_RAWLOG
 
-    CRobotPose2D pose = robot_pose + CRobotPose2D(0.0, 0.0, M_PI);
-    CRobotPose2D trans_pose = pose + CRobotPose2D(LIDAR_SENSOR_POSE, 0.0, 0.0);
-    line_segment_extraction.extractLongLineSegment(lidar.getLidarScan(), trans_pose, line_segment);
+  static_assert(kMapPositionX == 0, "Cannot extract PoseCovariance.");
+  static_assert(kMapPositionY == 1, "Cannot extract PoseCovariance.");
+  static_assert(kMapPositionZ == 2, "Cannot extract PoseCovariance.");
+  static_assert(kMapOrientationX == 3, "Cannot extract PoseCovariance.");
+  static_assert(kMapOrientationY == 4, "Cannot extract PoseCovariance.");
+  static_assert(kMapOrientationZ == 5, "Cannot extract PoseCovariance.");
+  *covariance = belief.GetCovariance().block<6, 6>(0, 0);
+  covariance->block<2, 2>(3, 3) +=
+      options_.imu_gravity_variance() * Eigen::Matrix2d::Identity();
+}
 
-    if(line_segment.size() <= 1)
-    {
-        return false;
-    }
 
-    for(int i = 0; i < line_segment.size(); i++)
-    {
-        CLineSegment line = line_segment.at(i);
-        for(int j = 1; j < line_segment.size(); j++)
-        {
-            if(!line.isParallel(line_segment.at(j), 0.3))
-            {
-                return false;
-            }
-        }
-    }
 
-    for(int i = 0; i < line_segment.size(); i++)
-    {
-        CLineSegment line = line_segment.at(i);
-        for(int j = 1; j < line_segment.size(); j++)
-        {
-            CRobotPose2D pose = line_segment.at(j).getStartPose();
-            if(line.getAbsDistanceFromPoint(pose) > 0.5)
-            {
-                return true;
-            }
-        }
-    }
 
-    return false;
+transform::Rigid3d PoseTracker::RigidFromState(
+    const PoseTracker::State& state) {
+  return transform::Rigid3d(
+      Eigen::Vector3d(state[PoseTracker::kMapPositionX],
+                      state[PoseTracker::kMapPositionY],
+                      state[PoseTracker::kMapPositionZ]),
+      transform::AngleAxisVectorToRotationQuaternion(
+          Eigen::Vector3d(state[PoseTracker::kMapOrientationX],
+                          state[PoseTracker::kMapOrientationY],
+                          state[PoseTracker::kMapOrientationZ])) *
+          imu_tracker_.orientation());
+}
+
+Pose2DCovariance Project2D(const PoseCovariance& covariance) {
+  Pose2DCovariance projected_covariance;
+  projected_covariance.block<2, 2>(0, 0) = covariance.block<2, 2>(0, 0);
+  projected_covariance.block<2, 1>(0, 2) = covariance.block<2, 1>(0, 5);
+  projected_covariance.block<1, 2>(2, 0) = covariance.block<1, 2>(5, 0);
+  projected_covariance(2, 2) = covariance(5, 5);
+  return projected_covariance;
 }
